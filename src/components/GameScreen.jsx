@@ -1,18 +1,19 @@
 import { useEffect, useState } from "react";
-import RadarCanvas from "./RadarCanvas";
 import { socket } from "../socket/socketClient";
+import RadarCanvas from "./RadarCanvas";
 
 function GameScreen({ role, roomCode, playerId }) {
 
   const [timeRemaining,setTimeRemaining] = useState(1200);
-  const [selfLocation,setSelfLocation] = useState(null);
   const [radarPlayers,setRadarPlayers] = useState([]);
+  const [selfLocation,setSelfLocation] = useState(null);
+  const [allPlayers,setAllPlayers] = useState({});
   const [danger,setDanger] = useState(null);
   const [demogorgonRadar,setDemogorgonRadar] = useState(false);
 
-  // =========================
+  // ======================
   // GPS STREAMING
-  // =========================
+  // ======================
 
   useEffect(()=>{
 
@@ -26,10 +27,19 @@ function GameScreen({ role, roomCode, playerId }) {
       (pos)=>{
 
         const { latitude,longitude,speed } = pos.coords;
+
         setSelfLocation({
           latitude,
           longitude
         });
+
+        setAllPlayers(prev=>({
+          ...prev,
+          [playerId]:{
+            latitude,
+            longitude
+          }
+        }));
 
         socket.emit("location_update",{
           roomCode,
@@ -60,18 +70,16 @@ function GameScreen({ role, roomCode, playerId }) {
   },[roomCode,playerId]);
 
 
-  // =========================
-  // GAME STATE TIMER
-  // =========================
+  // ======================
+  // GAME TIMER
+  // ======================
 
   useEffect(()=>{
 
     const handleGameState=(data)=>{
-
       if(data.timeRemainingSeconds !== undefined){
         setTimeRemaining(data.timeRemainingSeconds);
       }
-
     };
 
     socket.on("game_state",handleGameState);
@@ -83,17 +91,17 @@ function GameScreen({ role, roomCode, playerId }) {
   },[]);
 
 
-  // =========================
-  // RADAR UPDATE
-  // =========================
+  // ======================
+  // RADAR UPDATE FROM SERVER
+  // ======================
 
   useEffect(()=>{
 
     const handleRadar=(data)=>{
 
-      console.log("RADAR DATA:", data);
-      if(data.players){
+      console.log("RADAR DATA:",data);
 
+      if(data.players && data.players.length > 0){
         setRadarPlayers(data.players);
       }
 
@@ -108,9 +116,29 @@ function GameScreen({ role, roomCode, playerId }) {
   },[]);
 
 
-  // =========================
+  // ======================
+  // DEMOGORGON RADAR WINDOW
+  // ======================
+
+  useEffect(()=>{
+
+    const radarOn=()=>setDemogorgonRadar(true);
+    const radarOff=()=>setDemogorgonRadar(false);
+
+    socket.on("demogorgon_radar_active",radarOn);
+    socket.on("demogorgon_radar_off",radarOff);
+
+    return ()=>{
+      socket.off("demogorgon_radar_active",radarOn);
+      socket.off("demogorgon_radar_off",radarOff);
+    };
+
+  },[]);
+
+
+  // ======================
   // DANGER ALERT
-  // =========================
+  // ======================
 
   useEffect(()=>{
 
@@ -127,53 +155,26 @@ function GameScreen({ role, roomCode, playerId }) {
   },[]);
 
 
-  // =========================
-  // DEMOGORGON RADAR WINDOW
-  // =========================
+  // ======================
+  // FRONTEND RADAR FALLBACK
+  // ======================
 
-  useEffect(()=>{
-
-    const radarOn=()=>{
-      setDemogorgonRadar(true);
-    };
-
-    const radarOff=()=>{
-      setDemogorgonRadar(false);
-    };
-
-    socket.on("demogorgon_radar_active",radarOn);
-    socket.on("demogorgon_radar_off",radarOff);
-
-    return ()=>{
-      socket.off("demogorgon_radar_active",radarOn);
-      socket.off("demogorgon_radar_off",radarOff);
-    };
-
-  },[]);
+  const simulatedRadarPlayers = Object.entries(allPlayers)
+    .filter(([id])=>id !== playerId)
+    .map(([id,data],index)=>({
+      playerNumber:index+1,
+      latitude:data.latitude,
+      longitude:data.longitude
+    }));
 
 
-  // =========================
-  // GAME END
-  // =========================
-
-  useEffect(()=>{
-
-    const handleGameEnd=(data)=>{
-      alert("Game Over! Winner: "+data.winner);
-    };
-
-    socket.on("game_end",handleGameEnd);
-
-    return ()=>{
-      socket.off("game_end",handleGameEnd);
-    };
-
-  },[]);
+  const radarData =
+    radarPlayers.length > 0 ? radarPlayers : simulatedRadarPlayers;
 
 
-  // =========================
+  // ======================
   // TIMER DISPLAY
-  // =========================
+  // ======================
 
   const minutes = Math.floor(timeRemaining/60);
   const seconds = timeRemaining % 60;
@@ -231,16 +232,12 @@ function GameScreen({ role, roomCode, playerId }) {
         )}
 
 
-        {/* Radar data preview */}
+        {/* RADAR */}
 
-        <div style={{marginTop:"30px"}}>
-
-          <RadarCanvas
-          players={radarPlayers}
+        <RadarCanvas
+          players={radarData}
           self={selfLocation}
         />
-
-        </div>
 
       </div>
 
