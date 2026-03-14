@@ -24,3 +24,7 @@ dist-ssr
 *.sw?
 
 frontend_spec.md
+
+*.exe
+src/assets/fonts/CursorUserSetup-x64-2.6.19.exe
+*.zip
