@@ -5,6 +5,7 @@ import { socket } from "../socket/socketClient";
 function GameScreen({ role, roomCode, playerId }) {
 
   const [timeRemaining,setTimeRemaining] = useState(1200);
+  const [selfLocation,setSelfLocation] = useState(null);
   const [radarPlayers,setRadarPlayers] = useState([]);
   const [danger,setDanger] = useState(null);
   const [demogorgonRadar,setDemogorgonRadar] = useState(false);
@@ -25,6 +26,10 @@ function GameScreen({ role, roomCode, playerId }) {
       (pos)=>{
 
         const { latitude,longitude,speed } = pos.coords;
+        setSelfLocation({
+          latitude,
+          longitude
+        });
 
         socket.emit("location_update",{
           roomCode,
@@ -228,7 +233,10 @@ function GameScreen({ role, roomCode, playerId }) {
 
         <div style={{marginTop:"30px"}}>
 
-          <RadarCanvas players={radarPlayers} />
+          <RadarCanvas
+          players={radarPlayers}
+          self={selfLocation}
+        />
 
         </div>
 
