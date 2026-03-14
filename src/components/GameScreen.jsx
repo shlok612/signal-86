@@ -91,7 +91,9 @@ function GameScreen({ role, roomCode, playerId }) {
 
     const handleRadar=(data)=>{
 
+      console.log("RADAR DATA:", data);
       if(data.players){
+
         setRadarPlayers(data.players);
       }
 
