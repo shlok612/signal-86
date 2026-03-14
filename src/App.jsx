@@ -123,7 +123,7 @@ function App() {
         {screen === "game" && (
           <GameScreen role={role}
               roomCode={roomCode}
-              playerId={playerId} />
+              ngorkplayerId={playerId} />
         )}
 
       </div>
