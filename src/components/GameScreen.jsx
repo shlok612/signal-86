@@ -9,7 +9,9 @@ function GameScreen({ role, roomCode, playerId }) {
   const [selfLocation,setSelfLocation] = useState(null);
   const [allPlayers,setAllPlayers] = useState({});
   const [danger,setDanger] = useState(null);
+  const [dangerCountdown, setDangerCountdown] = useState(null);
   const [demogorgonRadar,setDemogorgonRadar] = useState(false);
+  const [socketError, setSocketError] = useState(null);
 
   // ======================
   // GPS STREAMING
@@ -77,7 +79,7 @@ function GameScreen({ role, roomCode, playerId }) {
   useEffect(()=>{
 
     const handleGameState=(data)=>{
-      if(data.timeRemainingSeconds !== undefined){
+      if (data && typeof data.timeRemainingSeconds === "number") {
         setTimeRemaining(data.timeRemainingSeconds);
       }
     };
@@ -98,13 +100,9 @@ function GameScreen({ role, roomCode, playerId }) {
   useEffect(()=>{
 
     const handleRadar=(data)=>{
-
-      console.log("RADAR DATA:",data);
-
-      if(data.players && data.players.length > 0){
-        setRadarPlayers(data.players);
-      }
-
+      // Spec: radar_update payload is { event, players }. Visibility can be restricted → players may be [].
+      const list = Array.isArray(data?.players) ? data.players : [];
+      setRadarPlayers(list);
     };
 
     socket.on("radar_update",handleRadar);
@@ -137,13 +135,30 @@ function GameScreen({ role, roomCode, playerId }) {
 
 
   // ======================
+  // SOCKET ERROR (spec: payload { code, message })
+  // ======================
+
+  useEffect(() => {
+    const handleError = (payload) => {
+      const message = payload?.message ?? payload?.code ?? "Something went wrong";
+      setSocketError(typeof message === "string" ? message : "Unknown error");
+    };
+    socket.on("error", handleError);
+    return () => {
+      socket.off("error", handleError);
+    };
+  }, []);
+
+  // ======================
   // DANGER ALERT
   // ======================
 
   useEffect(()=>{
 
     const handleDanger=(data)=>{
-      setDanger(data.distance);
+      if (!data) return;
+      setDanger(typeof data.distance === "number" ? data.distance : null);
+      setDangerCountdown(typeof data.countdownRemaining === "number" ? data.countdownRemaining : null);
     };
 
     socket.on("danger_alert",handleDanger);
@@ -203,16 +218,36 @@ function GameScreen({ role, roomCode, playerId }) {
         </div>
 
 
-        {/* Danger alert */}
+        {/* Socket error (spec: error event) */}
 
-        {danger && role === "cypher" && (
+        {socketError && (
+          <div style={{
+            marginTop: "12px",
+            padding: "8px 12px",
+            background: "rgba(255, 68, 68, 0.15)",
+            color: "#ff4444",
+            borderRadius: "6px",
+            fontSize: "14px"
+          }}>
+            {socketError}
+          </div>
+        )}
+
+        {/* Danger alert (spec: show distance and countdownRemaining) */}
+
+        {danger != null && role === "cypher" && (
 
           <div style={{
             marginTop:"20px",
             color:"red",
             fontWeight:"bold"
           }}>
-            DEMOGORGON NEARBY ({danger.toFixed(1)}m)
+            DEMOGORGON NEARBY ({Number(danger).toFixed(1)}m)
+            {dangerCountdown != null && (
+              <span style={{ display: "block", marginTop: "4px", fontSize: "14px" }}>
+                Countdown: {Number(dangerCountdown).toFixed(1)}s
+              </span>
+            )}
           </div>
 
         )}

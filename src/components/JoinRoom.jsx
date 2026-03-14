@@ -4,6 +4,7 @@ import { socket } from "../socket/socketClient";
 function JoinRoom({ setScreen,setRoomCode,setPlayerId }) {
 
   const [code,setCode] = useState(["","","",""]);
+  const [socketError, setSocketError] = useState(null);
 
   const handleChange = (value,index)=>{
 
@@ -28,6 +29,7 @@ function JoinRoom({ setScreen,setRoomCode,setPlayerId }) {
       return;
     }
 
+    setSocketError(null);
     socket.emit("join_room",{
       roomCode,
       playerName:"Player"
@@ -38,20 +40,24 @@ function JoinRoom({ setScreen,setRoomCode,setPlayerId }) {
   useEffect(()=>{
 
     const handleJoined=(data)=>{
-
-      console.log("room_joined:",data);
-
+      if (!data || typeof data.roomCode !== "string") return;
+      setSocketError(null);
       setRoomCode(data.roomCode);
       setPlayerId(data.playerId);
-
       setScreen("lobby");
-
     };
 
-    socket.on("room_joined",handleJoined);
+    const handleError = (payload) => {
+      const msg = payload?.message ?? payload?.code ?? "Join failed";
+      setSocketError(typeof msg === "string" ? msg : "Unknown error");
+    };
+
+    socket.on("room_joined", handleJoined);
+    socket.on("error", handleError);
 
     return ()=>{
-      socket.off("room_joined",handleJoined);
+      socket.off("room_joined", handleJoined);
+      socket.off("error", handleError);
     };
 
   },[setRoomCode,setPlayerId,setScreen]);
@@ -80,6 +86,20 @@ function JoinRoom({ setScreen,setRoomCode,setPlayerId }) {
           ))}
 
         </div>
+
+        {socketError && (
+          <div style={{
+            marginTop: "12px",
+            marginBottom: "8px",
+            padding: "8px 12px",
+            background: "rgba(255, 68, 68, 0.15)",
+            color: "#ff4444",
+            borderRadius: "6px",
+            fontSize: "14px"
+          }}>
+            {socketError}
+          </div>
+        )}
 
         <button
           className="menu-button"

@@ -58,15 +58,21 @@ function RadarCanvas({ players, self }) {
     ctx.arc(center, center, 5, 0, Math.PI * 2);
     ctx.fill();
 
-    if (!self) return;
+    if (!self || typeof self.latitude !== "number" || typeof self.longitude !== "number") return;
 
-    players.forEach((p) => {
+    const safePlayers = Array.isArray(players) ? players : [];
+
+    safePlayers.forEach((p) => {
+
+      const lat = p?.latitude;
+      const lon = p?.longitude;
+      if (typeof lat !== "number" || typeof lon !== "number") return;
 
       const dist = haversine(
         self.latitude,
         self.longitude,
-        p.latitude,
-        p.longitude
+        lat,
+        lon
       );
 
       if (dist > 100) return;
@@ -74,8 +80,8 @@ function RadarCanvas({ players, self }) {
       const ang = bearing(
         self.latitude,
         self.longitude,
-        p.latitude,
-        p.longitude
+        lat,
+        lon
       );
 
       const r = (dist / 100) * radarRadius;

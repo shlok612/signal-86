@@ -11,40 +11,39 @@ function CreateRoom({
   setRole
 }){
   const [players, setPlayers] = useState([]);
+  const [socketError, setSocketError] = useState(null);
 
   useEffect(() => {
 
     const handleRoomCreated = (data) => {
-
-      console.log("room_created:", data);
-
+      if (!data || typeof data.roomCode !== "string") return;
+      setSocketError(null);
       setRoomCode(data.roomCode);
       setPlayerId(data.playerId);
-
     };
 
     const handleRoomPlayers = (data) => {
-
-      if (Array.isArray(data.players)) {
+      if (data && Array.isArray(data.players)) {
         setPlayers(data.players);
       }
+    };
 
+    const handleError = (payload) => {
+      const msg = payload?.message ?? payload?.code ?? "Something went wrong";
+      setSocketError(typeof msg === "string" ? msg : "Unknown error");
+    };
+
+    const handleRoleAssignment = (data) => {
+      if (!data || !data.role) return;
+      setSocketError(null);
+      setRole(data.role);
+      setScreen("game");
     };
 
     socket.on("room_created", handleRoomCreated);
     socket.on("room_players", handleRoomPlayers);
-
-    const handleRoleAssignment = (data) => {
-
-      console.log("role_assignment:", data);
-
-      setRole(data.role);
-
-      setScreen("game");
-
-    };
-
-socket.on("role_assignment", handleRoleAssignment);
+    socket.on("error", handleError);
+    socket.on("role_assignment", handleRoleAssignment);
     if (isHost && !roomCode) {
 
       socket.emit("create_room", {
@@ -55,10 +54,9 @@ socket.on("role_assignment", handleRoleAssignment);
 
     return () => {
       socket.off("role_assignment", handleRoleAssignment);
-
       socket.off("room_created", handleRoomCreated);
       socket.off("room_players", handleRoomPlayers);
-
+      socket.off("error", handleError);
     };
 
   }, [isHost, roomCode, setRoomCode, setPlayerId]);
@@ -131,6 +129,19 @@ socket.on("role_assignment", handleRoleAssignment);
         <div className="room-status">
           {players.length} player{players.length !== 1 && "s"} in lobby
         </div>
+
+        {socketError && (
+          <div style={{
+            marginTop: "12px",
+            padding: "8px 12px",
+            background: "rgba(255, 68, 68, 0.15)",
+            color: "#ff4444",
+            borderRadius: "6px",
+            fontSize: "14px"
+          }}>
+            {socketError}
+          </div>
+        )}
 
         {isHost && (
 
