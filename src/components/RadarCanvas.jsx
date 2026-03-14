@@ -41,6 +41,7 @@ function RadarCanvas({ players, self }) {
     const size = 300;
     const center = size / 2;
     const radarRadius = 120;
+    const maxDisplayMeters = 200; // show others up to 200m; farther = clamped to edge
 
     ctx.clearRect(0, 0, size, size);
 
@@ -75,8 +76,6 @@ function RadarCanvas({ players, self }) {
         lon
       );
 
-      if (dist > 100) return;
-
       const ang = bearing(
         self.latitude,
         self.longitude,
@@ -84,7 +83,8 @@ function RadarCanvas({ players, self }) {
         lon
       );
 
-      const r = (dist / 100) * radarRadius;
+      // Show all others: clamp to edge so far players still appear on radar
+      const r = Math.min(1, dist / maxDisplayMeters) * radarRadius;
 
       const x = center + r * Math.cos(ang);
       const y = center + r * Math.sin(ang);

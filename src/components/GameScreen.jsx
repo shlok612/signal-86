@@ -6,6 +6,8 @@ function GameScreen({ role, roomCode, playerId }) {
 
   const [timeRemaining,setTimeRemaining] = useState(1200);
   const [radarPlayers,setRadarPlayers] = useState([]);
+  // Last-known positions from server so we keep showing others when radar_update sometimes sends []
+  const [lastKnownRadar, setLastKnownRadar] = useState({});
   const [selfLocation,setSelfLocation] = useState(null);
   const [allPlayers,setAllPlayers] = useState({});
   const [danger,setDanger] = useState(null);
@@ -100,9 +102,25 @@ function GameScreen({ role, roomCode, playerId }) {
   useEffect(()=>{
 
     const handleRadar=(data)=>{
-      // Spec: radar_update payload is { event, players }. Visibility can be restricted → players may be [].
       const list = Array.isArray(data?.players) ? data.players : [];
       setRadarPlayers(list);
+      // Merge into last-known so every device keeps showing others even when server sends [] sometimes
+      if (list.length > 0) {
+        setLastKnownRadar((prev) => {
+          const next = { ...prev };
+          list.forEach((p) => {
+            if (p != null && typeof p.playerNumber !== "undefined" && typeof p.latitude === "number" && typeof p.longitude === "number") {
+              next[p.playerNumber] = {
+                playerNumber: p.playerNumber,
+                latitude: p.latitude,
+                longitude: p.longitude,
+                updatedAt: Date.now(),
+              };
+            }
+          });
+          return next;
+        });
+      }
     };
 
     socket.on("radar_update",handleRadar);
@@ -171,20 +189,17 @@ function GameScreen({ role, roomCode, playerId }) {
 
 
   // ======================
-  // FRONTEND RADAR FALLBACK
+  // RADAR DATA: server snapshot or last-known so every device sees others
   // ======================
 
-  const simulatedRadarPlayers = Object.entries(allPlayers)
-    .filter(([id])=>id !== playerId)
-    .map(([id,data],index)=>({
-      playerNumber:index+1,
-      latitude:data.latitude,
-      longitude:data.longitude
-    }));
-
+  const STALE_MS = 20000; // stop showing positions not seen for 20s
+  const now = Date.now();
+  const freshLastKnown = Object.values(lastKnownRadar)
+    .filter((p) => p && (now - (p.updatedAt ?? 0)) < STALE_MS)
+    .map(({ playerNumber, latitude, longitude }) => ({ playerNumber, latitude, longitude }));
 
   const radarData =
-    radarPlayers.length > 0 ? radarPlayers : simulatedRadarPlayers;
+    radarPlayers.length > 0 ? radarPlayers : freshLastKnown;
 
 
   // ======================
